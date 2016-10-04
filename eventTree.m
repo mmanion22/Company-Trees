@@ -14,30 +14,36 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+% It would be good to have a header with things like the objective,
+% dependencies, maybe the date and your name just in case
+
 clear
-[num,~,raw] = xlsread('R:\Mark M\Matt\All Events 1995-2016.csv','All Events 1995-2016');
-[num2,~,raw2] = xlsread('R:\Mark M\Matt\All Names.csv','All Names');
-[num3,~,~] = xlsread('R:\Mark M\Matt\CRSP Compustat Link 1995-2016.csv','CRSP Compustat Link 1995-2016');
-[num4,~,~] = xlsread('R:\Mark M\Matt\Quarterly Assets.csv','Quarterly Assets');
+% I like for Matlab to have a home directory, it makes pulling stuff easier
+% and makes commands shorter
+home = 'R:\Mark M\Matt';
+cd(home)
+
+% it might be good to give these more descriptive names, but it's not a huge deal
+[all_events,~,raw] = xlsread('All Events 1995-2016.csv','All Events 1995-2016');
+[num2,~,raw2] = xlsread('All Names.csv','All Names');
+[num3,~,~] = xlsread('CRSP Compustat Link 1995-2016.csv','CRSP Compustat Link 1995-2016');
+[num4,~,~] = xlsread('Quarterly Assets.csv','Quarterly Assets');
 
 %Creates a directory of all PERMNO's and PERMCO's
-all_ids = num(:,(1:2));
+all_ids = all_events(:,(1:2));
 
 %Creates a matrix of all instances when a delisting occurs
-all_events = num;
 all_events_temp = all_events(:,(3:6));
 all_events_temp(isnan(all_events_temp)==1) = 0;
 [~,unique_index,~] = unique(all_events_temp,'rows','stable');
 important_events = all_events(unique_index,:);
 
-
-
-
 %Creates an empty treeMatrix that will be added to in the function        
 treeMatrixBlank = NaN(0,size(all_events,2)+1);
 sigMergersBlank = NaN(0,size(all_events,2));
 
-
+%Initialize list of permcos we care about
 permco_list = [7 54287 20017 41871 137 29870 216 15473 20204 20684 90,...
     20315 3151 20277 11112 20265 36336 20331 540 20483 20408,...
     20473 43613 30513 21401 7882 10486 21185 20440 20606 20587,...
@@ -49,16 +55,20 @@ permco_list = [7 54287 20017 41871 137 29870 216 15473 20204 20684 90,...
     11592 21576 21640 30086 21645 20561 11412 21737 7267 21810,...
     36383 1645 21832 52983 20288 21881 21305 21880 20678];
 
+%No need to assign these every loop
+%File destination and suffix
+folder = 'R:\Mark M\Matt\Company Trees\S&P 100\';
+type = ' Tree.csv';
+%variable a is a matrix that corresponds to raw cell data from Names file
+a = [NaN(1,7);num2];
 for n=1:size(permco_list,2);
-    %for each element in permco_list
+    %this comment didn't really make sense here, maybe before the loop, and
+    %also some extra about the loop could be helpful
     [treeMatrix,sigMergers] = eventBranch(permco_list(n),all_events,important_events,treeMatrixBlank,sigMergersBlank,num3,num4,0);
 
     %Converts tree to cell and adds extra columns for name and share class variables
     treeMatrix = num2cell(treeMatrix);
     treeMatrix = [treeMatrix,cell(size(treeMatrix,1),2)];
-
-    %variable a is a matrix that corresponds to raw cell data from Names file
-    a = [NaN(1,7);num2];
 
     %adds most recent name and share class for each PERMNO the tree
     for j=1:size(treeMatrix,1);
@@ -74,20 +84,15 @@ for n=1:size(permco_list,2);
     
     %adds the column for significant mergers
     treeMatrix = [treeMatrix,num2cell(zeros(size(treeMatrix,1),1))];
-    for z=1:size(sigMergers,1);
-        for y=2:size(treeMatrix,1);
-            if (sigMergers(z,1)==cell2mat(treeMatrix(y,3)));
-                treeMatrix(y,10) = {1};
-            end
-        end
+    for z=2:size(treeMatrix,1);
+        treeMatrix(z,10) = {sum(sigMergers(:,1)==cell2mat(treeMatrix(z,3)))>0};
     end
     treeMatrix(1,10) = {'Significant Merger'};
     
     %adds the column for whether a GVKEY link exists
     treeMatrix = [treeMatrix,num2cell(ones(size(treeMatrix,1),1))];
     for b=2:size(treeMatrix,1);
-        tempKey = num3(num3(:,6)==cell2mat(treeMatrix(b,4)),1);
-        tempKey = unique(tempKey);
+        tempKey = unique(num3(num3(:,6)==cell2mat(treeMatrix(b,4)),1));
         if (isempty(tempKey) == 1);
             treeMatrix(b,11) = {0};
         end
@@ -103,16 +108,7 @@ for n=1:size(permco_list,2);
         parent_name = parent_name(1,:);
     end
     
-    %File destination and suffix
-    folder = 'R:\Mark M\Matt\Company Trees\S&P 100\';
-    type = ' Tree.csv';
-    
+    % write to excel (could you do a CSV here? it's faster)
     xlswrite([folder,parent_name,type],treeMatrix);
     
 end
-
-
-
-
-
-
